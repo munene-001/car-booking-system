@@ -1,0 +1,38 @@
+type CarBooking = record {
+  id : text;
+  carModel : text;
+  endDate : nat64;
+  userId : text;
+  createdAt : nat64;
+  isPaid : bool;
+  updatedAt : opt nat64;
+  price : float64;
+  location : text;
+  startDate : nat64;
+};
+type CarBookingPayload = record {
+  carModel : text;
+  endDate : nat64;
+  userId : text;
+  isPaid : bool;
+  price : float64;
+  location : text;
+  startDate : nat64;
+};
+type _AzleResult = variant { Ok : CarBooking; Err : text };
+type _AzleResult_1 = variant { Ok : float64; Err : text };
+type _AzleResult_2 = variant { Ok : vec CarBooking; Err : text };
+service : () -> {
+  addCarBooking : (CarBookingPayload) -> (_AzleResult);
+  countCarBookings : () -> (_AzleResult_1) query;
+  deleteCarBooking : (text) -> (_AzleResult);
+  getCarBooking : (text) -> (_AzleResult) query;
+  getCarBookings : () -> (_AzleResult_2) query;
+  getCarBookingsByCarModel : (text) -> (_AzleResult_2) query;
+  getCarBookingsByEndDate : (nat64) -> (_AzleResult_2) query;
+  getCarBookingsByStartDate : (nat64) -> (_AzleResult_2) query;
+  getCarBookingsByTimeRange : (nat64, nat64) -> (_AzleResult_2) query;
+  getCarBookingsPaginated : (float64, float64) -> (_AzleResult_2) query;
+  searchCarBookings : (text) -> (_AzleResult_2) query;
+  updateCarBooking : (text, CarBookingPayload) -> (_AzleResult);
+}
