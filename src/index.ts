@@ -13,7 +13,7 @@ type CarBooking = Record<{
     isPaid: boolean;
     createdAt: nat64;
     updatedAt: Opt<nat64>;
-}>
+}>;
 
 // Define the type for the payload used in creating or updating a car booking
 type CarBookingPayload = Record<{
@@ -24,7 +24,7 @@ type CarBookingPayload = Record<{
     userId: string;
     price: number;
     isPaid: boolean;
-}>
+}>;
 
 // Create storage for car bookings
 const carBookingStorage = new StableBTreeMap<string, CarBooking>(0, 44, 1024);
@@ -37,8 +37,8 @@ $query;
 export function getCarBookings(): Result<Vec<CarBooking>, string> {
     try {
         return Result.Ok(carBookingStorage.values());
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting car bookings: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting car bookings');
     }
 }
 
@@ -50,12 +50,14 @@ export function getCarBookings(): Result<Vec<CarBooking>, string> {
 $query;
 export function getCarBooking(id: string): Result<CarBooking, string> {
     try {
-        return match(carBookingStorage.get(id), {
-            Some: (carBooking) => Result.Ok<CarBooking, string>(carBooking),
-            None: () => Result.Err<CarBooking, string>(`A car booking with id=${id} not found`)
-        });
-    } catch (error: unknown) {
-        return Result.Err<CarBooking, string>(`Error getting car booking: ${(error as Error).message}`);
+        const carBooking = carBookingStorage.get(id);
+        if (carBooking) {
+            return Result.Ok(carBooking);
+        } else {
+            return Result.Err<CarBooking, string>(`A car booking with id=${id} not found`);
+        }
+    } catch (error) {
+        return Result.Err<CarBooking, string>('Error getting car booking');
     }
 }
 
@@ -67,28 +69,32 @@ export function getCarBooking(id: string): Result<CarBooking, string> {
 $update;
 export function addCarBooking(payload: CarBookingPayload): Result<CarBooking, string> {
     try {
-        // Validate input
-        if (!payload.carModel || !payload.startDate || !payload.endDate || !payload.location || !payload.userId || payload.price === undefined || payload.isPaid === undefined) {
+        const { carModel, startDate, endDate, location, userId, price, isPaid } = payload;
+        if (!carModel || !startDate || !endDate || !location || !userId || price === undefined || isPaid === undefined) {
             return Result.Err<CarBooking, string>('Invalid input. Please provide all required fields.');
         }
 
-        // Validate date range
-        if (payload.startDate >= payload.endDate) {
+        if (startDate >= endDate) {
             return Result.Err<CarBooking, string>('End date must be after the start date.');
         }
 
-        // Create and insert the car booking
         const carBooking: CarBooking = {
             id: uuidv4(),
             createdAt: ic.time(),
             updatedAt: Opt.None,
-            ...payload
+            carModel,
+            startDate,
+            endDate,
+            location,
+            userId,
+            price,
+            isPaid
         };
         carBookingStorage.insert(carBooking.id, carBooking);
 
         return Result.Ok(carBooking);
-    } catch (error: unknown) {
-        return Result.Err<CarBooking, string>(`Error adding car booking: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<CarBooking, string>('Error adding car booking');
     }
 }
 
@@ -101,31 +107,29 @@ export function addCarBooking(payload: CarBookingPayload): Result<CarBooking, st
 $update;
 export function updateCarBooking(id: string, payload: CarBookingPayload): Result<CarBooking, string> {
     try {
-        // Validate input
-        if (!payload.carModel || !payload.startDate || !payload.endDate || !payload.location || !payload.userId || payload.price === undefined || payload.isPaid === undefined) {
+        const { carModel, startDate, endDate, location, userId, price, isPaid } = payload;
+        if (!carModel || !startDate || !endDate || !location || !userId || price === undefined || isPaid === undefined) {
             return Result.Err<CarBooking, string>('Invalid input. Please provide all required fields.');
         }
 
-        // Validate date range
-        if (payload.startDate >= payload.endDate) {
+        if (startDate >= endDate) {
             return Result.Err<CarBooking, string>('End date must be after the start date.');
         }
 
-        // Update the car booking
-        return match(carBookingStorage.get(id), {
-            Some: (carBooking) => {
-                const updatedCarBooking: CarBooking = {
-                    ...carBooking,
-                    ...payload,
-                    updatedAt: Opt.Some(ic.time())
-                };
-                carBookingStorage.insert(carBooking.id, updatedCarBooking);
-                return Result.Ok<CarBooking, string>(updatedCarBooking);
-            },
-            None: () => Result.Err<CarBooking, string>(`Couldn't update a car booking with id=${id}. Car booking not found`)
-        });
-    } catch (error: unknown) {
-        return Result.Err<CarBooking, string>(`Error updating car booking: ${(error as Error).message}`);
+        const carBooking = carBookingStorage.get(id);
+        if (carBooking) {
+            const updatedCarBooking: CarBooking = {
+                ...carBooking,
+                ...payload,
+                updatedAt: Opt.Some(ic.time())
+            };
+            carBookingStorage.insert(carBooking.id, updatedCarBooking);
+            return Result.Ok(updatedCarBooking);
+        } else {
+            return Result.Err<CarBooking, string>(`Couldn't update a car booking with id=${id}. Car booking not found`);
+        }
+    } catch (error) {
+        return Result.Err<CarBooking, string>('Error updating car booking');
     }
 }
 
@@ -137,12 +141,14 @@ export function updateCarBooking(id: string, payload: CarBookingPayload): Result
 $update;
 export function deleteCarBooking(id: string): Result<CarBooking, string> {
     try {
-        return match(carBookingStorage.remove(id), {
-            Some: (deletedCarBooking) => Result.Ok<CarBooking, string>(deletedCarBooking),
-            None: () => Result.Err<CarBooking, string>(`Couldn't delete a car booking with id=${id}. Car booking not found.`)
-        });
-    } catch (error: unknown) {
-        return Result.Err<CarBooking, string>(`Error deleting car booking: ${(error as Error).message}`);
+        const deletedCarBooking = carBookingStorage.remove(id);
+        if (deletedCarBooking) {
+            return Result.Ok(deletedCarBooking);
+        } else {
+            return Result.Err<CarBooking, string>(`Couldn't delete a car booking with id=${id}. Car booking not found.`);
+        }
+    } catch (error) {
+        return Result.Err<CarBooking, string>('Error deleting car booking');
     }
 }
 
@@ -161,8 +167,8 @@ export function searchCarBookings(keyword: string): Result<Vec<CarBooking>, stri
             );
 
         return Result.Ok(filteredBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error searching car bookings: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error searching car bookings');
     }
 }
 
@@ -174,13 +180,9 @@ $query;
 export function countCarBookings(): Result<number, string> {
     try {
         const count = carBookingStorage.len();
-
-        // Convert the bigint to number
-        const countAsNumber = Number(count);
-
-        return Result.Ok(countAsNumber);
-    } catch (error: unknown) {
-        return Result.Err<number, string>(`Error counting car bookings: ${(error as Error).message}`);
+        return Result.Ok(Number(count));
+    } catch (error) {
+        return Result.Err<number, string>('Error counting car bookings');
     }
 }
 
@@ -195,10 +197,9 @@ export function getCarBookingsPaginated(page: number, pageSize: number): Result<
     try {
         const startIdx = (page - 1) * pageSize;
         const paginatedBookings = carBookingStorage.values().slice(startIdx, startIdx + pageSize);
-
         return Result.Ok(paginatedBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting paginated car bookings: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting paginated car bookings');
     }
 }
 
@@ -216,8 +217,8 @@ export function getCarBookingsByTimeRange(startTime: nat64, endTime: nat64): Res
             .filter((booking) => booking.startDate >= startTime && booking.endDate <= endTime);
 
         return Result.Ok(filteredBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting car bookings by time range: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting car bookings by time range');
     }
 }
 
@@ -234,8 +235,8 @@ export function getCarBookingsByStartDate(startDate: nat64): Result<Vec<CarBooki
             .filter((booking) => booking.startDate === startDate);
 
         return Result.Ok(filteredBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting car bookings by start date: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting car bookings by start date');
     }
 }
 
@@ -252,8 +253,8 @@ export function getCarBookingsByEndDate(endDate: nat64): Result<Vec<CarBooking>,
             .filter((booking) => booking.endDate === endDate);
 
         return Result.Ok(filteredBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting car bookings by end date: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting car bookings by end date');
     }
 }
 
@@ -270,8 +271,8 @@ export function getCarBookingsByCarModel(carModel: string): Result<Vec<CarBookin
             .filter((booking) => booking.carModel.toLowerCase() === carModel.toLowerCase());
 
         return Result.Ok(filteredBookings);
-    } catch (error: unknown) {
-        return Result.Err<Vec<CarBooking>, string>(`Error getting car bookings by car model: ${(error as Error).message}`);
+    } catch (error) {
+        return Result.Err<Vec<CarBooking>, string>('Error getting car bookings by car model');
     }
 }
 
@@ -288,4 +289,3 @@ globalThis.crypto = {
         return array;
     }
 };
-
